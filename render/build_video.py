@@ -13,7 +13,16 @@ def get(url,path):
 font=P/'Amiri-Regular.ttf'; get('https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf',font)
 assert features.check('raqm'), 'Arabic text requires RAQM shaping'
 for name in ['01-logo.png','02-bot.png','03-app.png']:
- get(BASE+'assets/'+name,P/name)
+ try: get(BASE+'assets/'+name,P/name)
+ except Exception as e:
+  print('Asset download unavailable; use authored vector illustration',name,str(e)[:120],flush=True)
+  art=Image.new('RGB',(1200,720),BG);ad=ImageDraw.Draw(art)
+  ad.rounded_rectangle((350,170,850,550),radius=75,fill=PANEL,outline=GREEN,width=12)
+  if name=='01-logo.png':
+   ad.ellipse((450,300,505,355),fill=WHITE);ad.ellipse((695,300,750,355),fill=WHITE);ad.line((510,440,690,440),fill=GREEN,width=14);ad.line((600,90,600,170),fill=GREEN,width=12)
+  else:
+   ad.polygon([(600,230),(730,280),(710,420),(600,490),(490,420),(470,280)],outline=GREEN,width=10);ad.line((540,350,585,400,670,310),fill=WHITE,width=14)
+  art.save(P/name)
 def ft(n): return ImageFont.truetype(str(font),n)
 def rtl(draw,text,y,size=52,color=WHITE,x=540,width=900):
  words=text.split(); lines=[]; line=''; f=ft(size)
