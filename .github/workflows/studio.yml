@@ -1,0 +1,58 @@
+name: Render studio motion films
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chromium and media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libnss3 libatk-bridge2.0-0 libxkbcommon0 libgbm1 libasound2t64
+          pip install numpy pillow edge-tts
+          npm install --no-audit --no-fund
+          npx remotion browser ensure
+      - name: Prepare natural Arabic voice and original score
+        run: python -u prepare.py
+      - name: Render A studio keynote
+        run: |
+          mkdir -p out
+          npx remotion render Main.tsx StudioA out/netbot-studio-A.mp4 --codec=h264 --video-bitrate=12M --audio-bitrate=192k --h264-profile=high --pixel-format=yuv420p --x264-preset=fast --concurrency=2 --gl=angle
+      - name: Render B neon tech
+        run: npx remotion render Main.tsx StudioB out/netbot-studio-B.mp4 --codec=h264 --video-bitrate=12M --audio-bitrate=192k --h264-profile=high --pixel-format=yuv420p --x264-preset=fast --concurrency=2 --gl=angle
+      - name: Verify streams and extract 24 real frames
+        run: python -u verify.py
+      - name: Publish films and visual review evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="studio-v2-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" out/netbot-studio-A.mp4 out/netbot-studio-B.mp4 out/cover-A.jpg out/cover-B.jpg out/contact-A.jpg out/contact-B.jpg out/ffprobe-A.json out/ffprobe-B.json out/validation.json out/all-review-frames.zip --target "$GITHUB_SHA" --title "samir-netbot studio v2 — A and B" --notes "Remotion React/Chromium. Two 48-second 1080x1920 60fps H.264 High/AAC editions. Conceptual UI, consent-first. Original procedural score with ducking and synthesized SFX. Technical evidence and 24 extracted review frames attached."
+          echo "RELEASE_TAG=$TAG"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout -b "studio-review-${GITHUB_RUN_ID}"
+          git add -f out/contact-A.jpg out/contact-B.jpg out/frames-A/*.jpg out/frames-B/*.jpg out/cover-A.jpg out/cover-B.jpg
+          git commit -m "Actual rendered frames for studio v2 visual review"
+          git push origin HEAD
+          echo "REVIEW_BRANCH=studio-review-${GITHUB_RUN_ID}"
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-evidence
+          path: studio/out/
+          retention-days: 7
