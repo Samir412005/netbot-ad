@@ -1,0 +1,41 @@
+name: Render Arabic netbot video
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'render/**'
+      - '.github/workflows/render-ad.yml'
+permissions:
+  contents: write
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg espeak-ng
+          python -m pip install --upgrade pillow edge-tts
+      - name: Build and verify portrait MP4
+        run: python -u render/build_video.py
+      - name: Publish verified video
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ad-48s-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" render/out/netbot-ad-48s.mp4 render/out/ffprobe.json render/out/validation.json render/out/contact-sheet.jpg render/out/poster.png --title "samir-netbot — 48s Arabic portrait video" --notes "Conceptual UI. H.264/AAC video. See validation.json for measured duration, audio level and actual voice mode."
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/netbot-ad-48s.mp4"
+          echo "DIRECT_VIDEO_DOWNLOAD=$URL"
+          echo "[Download MP4]($URL)" >> "$GITHUB_STEP_SUMMARY"
+          cat render/out/validation.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendered-evidence
+          path: render/out/
+          retention-days: 7
